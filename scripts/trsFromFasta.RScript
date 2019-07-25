@@ -1,0 +1,21 @@
+trsFromFasta=function(f)
+{
+  print(f)
+  f=read.csv(sep='~', f, stringsAsFactors=F, header=F)$V1
+  trs=unlist(lapply(strsplit(gsub(">","",f[grep('>',f)]), split=' '), function(h) h[[1]]))
+  seqind=grep('>',f)+1
+  if(length(unique(diff(seqind)))==1 && unique(diff(seqind))==2)
+  {
+    seq = f[!grepl('>',f)]
+  }
+  else
+  {
+    print('here')
+    print(head(seqind))
+    seqind=cbind(seqind, c(seqind[-1]-2, length(f)))
+    print(head(seqind))
+    
+    seq = lapply(1:dim(seqind)[[1]], function(h) paste(collapse='', f[seqind[h,1] : seqind[h,2]]))
+  }
+  cbind(trs, unlist(lapply(seq, nchar)), seq)
+}

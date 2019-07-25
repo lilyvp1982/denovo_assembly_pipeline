@@ -1,0 +1,42 @@
+/*** config file for rna_pipeline ***/
+/*** Please fill in with all particular parameters ***/
+
+/*** 0. Absolute Path to software paths file ***/
+pdir=/nfs/ngs/WINKNGS/Villarin/rna_pipeline/scripts/
+
+/*** 1. Absolute Path to labels file ***/
+labs=/nfs/ngs/WINKNGS/Villarin/NewNGS/Blatt-Laeuse/blattlaeuse1.labs.csv
+
+/*** 2. Absolute Path to results directory ***/
+odir=/nfs/ngs/WINKNGS/Villarin/NewNGS/Blatt-Laeuse/PIPELINE
+
+/*** 3. Filtering threshold for selten transcripts ***/
+/****** Which fraction of mapped reads we are going to loose, in order to remove all transcripts whose overall expression makes up
+/****** All less expressed transcripts will be removed whose summarized expression is 0.05*total_mapped_reads_to_raw_transcriptome. 
+thresh=0.05
+
+
+/*******   B.L.A.S.T. DB *******/
+
+/*** 4. Absolute path to annotation database ***/
+blastdb=/gcg/husar/gcgdata/gcgswissprot
+
+/*** 5. Database type: nucl/prot ***/
+blastdbtype=prot
+
+/*** 10. PID threshold ***/
+blastpid=70
+
+/*******   B.U.S.C.O *******/
+
+/*** 6. BUSCO config.init file ***/
+buscoconfig=/nfs/ngs/WINKNGS/Villarin/NewNGS/Blatt-Laeuse/blattlaeuse.busco.ini
+
+/*** 7. Absolute path to BUSCO database directory ***/
+buscodb=/nfs/ngs/WINKNGS/Villarin/BUSCODB/insecta_odb9/
+
+/*** 8. Absolute path to BUSCO results directory. This has to match the value of out_path (line 10) from busco.config.ini file!!!! ***/
+buscodir=/nfs/ngs/WINKNGS/Villarin/BUSCODB/
+
+/*** 9. BUSCO results prefix ***/
+buscopref=pipeline

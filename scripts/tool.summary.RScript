@@ -1,0 +1,274 @@
+args <- commandArgs(TRUE)
+#Rscript-3.0.1 tool.summary.RScript /nfs/ngs/WINKNGS/Villarin/NewNGS/Blatt-Laeuse/PIPELINE/ /nfs/ngs/WINKNGS/Villarin/NewNGS/Blatt-Laeuse/blattl.labels.csv swissprot insecta_odb9 blastx 0.05 [blastpid=70]
+
+trsFromFasta=function(f)
+{
+  #print(f)
+  f=read.csv(sep='~', f, stringsAsFactors=F, header=F)$V1
+  trs=unlist(lapply(strsplit(gsub(">","",f[grep('>',f)]), split=' '), function(h) h[[1]]))
+  seqind=grep('>',f)+1
+  if(length(unique(diff(seqind)))==1 && unique(diff(seqind))==2)
+  {
+    seq = f[!grepl('>',f)]
+  }
+  else
+  {
+    seqind=cbind(seqind, c(seqind[-1]-2, length(f)))
+    print(head(seqind))
+    
+    seq = lapply(1:dim(seqind)[[1]], function(h) paste(collapse='', f[seqind[h,1] : seqind[h,2]]))
+  }
+  cbind(trs, unlist(lapply(seq, nchar)), seq)
+}
+
+subs.xtable=function(xtabs,text)
+{
+  for (keyword in names(xtabs))
+  {
+    #print(keyword)
+    t=print(xtabs[[keyword]])
+    #print(length(grep(keyword,text)))
+    if (length(grep(keyword,text))>0)
+      text[[grep(keyword,text)]]=t
+  }
+  text
+}
+list.intersect=function(l)
+{
+  if(length(l) < 2)
+    l
+  else 
+  {
+    l1=l[[1]]
+    for (i in l[-1])
+      l1=intersect(l1,i)  
+    l1
+  }  
+}
+
+if (length(args) < 7)
+{
+  print ("Need more parameters!")
+  print("Usage: Rscript tool.summary.RScript wd labs_file anndb buscodb blast thresh pipedir [blastpid=70]")
+  return  
+}
+
+#args=c("/nfs/ngs/WINKNGS/Villarin/NewNGS/Blatt-Laeuse/PIPELINE/","/nfs/ngs/WINKNGS/Villarin/NewNGS/Blatt-Laeuse/blattl.labels.csv","swissprot","insecta_odb9","blastx",0.05)
+
+results_dir=args[[1]]
+labels=args[[2]]
+anndb=strsplit(args[[3]], split="/")[[1]]
+anndb=gsub("_","\\\\\\\\_",anndb[[length(anndb)]])
+print(anndb)
+buscodb=strsplit(args[[4]], split="/")[[1]]
+buscodb=gsub("_","\\\\\\\\_",buscodb[[length(buscodb)]])
+print(buscodb)
+blast=strsplit(args[[5]], split="/")[[1]]
+blast=blast[[length(blast)]]
+thresh=args[[6]]
+pdir=args[[7]]
+
+blastpid=if( length(args) > 7) args[[8]] else 70 
+
+
+library(xtable)
+xtabs=list()
+
+setwd(results_dir)
+
+repdir='report'
+dir.create(repdir)
+
+labs=read.table(labels, stringsAsFactors=F, sep=',', header=T)
+if ( dim(labs)[[2]] == 4 )
+{ 
+  xtabs[["!!labs!!"]] = as.matrix(labs[,4])
+  colnames(xtabs[["!!labs!!"]]) = colnames(labs)[[4]]
+
+}else
+{
+  xtabs[["!!labs!!"]]= labs[,4:dim(labs)[[2]] ]
+}
+
+rownames(xtabs[["!!labs!!"]]) = labs$Shortname
+
+xtabs[["!!labs!!"]]=xtable(xtabs[["!!labs!!"]],caption="Experimental set up", label="table:labs")
+
+rownames(labs)=labs$File
+
+print('Mapping stats')
+
+mps = do.call(cbind,lapply(list.files('2.2.bams.filtered.transcriptomes.0.05/', pattern='counts', full.names=T), function(h) 
+{
+  h=read.table(h, stringsAsFactors=F);
+  h=colSums(h[,3:4])
+}))
+
+fn = gsub(".counts","",list.files('2.2.bams.filtered.transcriptomes.0.05/', pattern='counts'))
+rownames(mps)=c('mapped', 'unmapped')
+colnames(mps)= paste(labs[fn,'Species'], labs[fn,'Shortname'], sep=":") 
+
+mps=mps[, order(colnames(mps))]
+
+pdf(paste(sep="",repdir,'/mapping.pdf'), width=8, height=10)
+par(mar=c(15,5,5,5))
+b=barplot(mps, las=2, legend.text=c('mapped', 'unmapped'), cex=.7, cex.axis=.7, ylim=c(0,1.2*max(colSums(mps))), ylab='Sequenced Reads')
+text(b,colSums(mps) + min(.05*colSums(mps)),paste(sep="",format(digits=2,100*mps[1,]/colSums(mps)),'%'))
+dev.off()
+
+mps1=t(apply(mps,2, function(h) paste(sep="",h,"(",format(100*h/sum(h),digits=2),"%)")))
+colnames(mps1)=rownames(mps)
+
+xtabs[["!!table:mapstats!!"]]=xtable(mps1,caption="Mapping statistics of raw reads to filtered transcriptome", label="table:mapstats")
+
+print('BUSCO scores')
+
+b=lapply(list.files('2.4.busco/', full.names=T), function(h) 
+{ 
+  
+  h=read.csv(h, sep='~', stringsAsFactors=F)[[1]][c(4,7:12)];
+  s=strsplit(h[[1]],split='//')[[1]]
+  s=strsplit(s[[length(s)]], split='[.]filtered')[[1]][[1]]
+  h=do.call(rbind, strsplit(h[2:length(h)], split='\t'))[,2:3]
+  list(s,h)
+})
+
+if ( length(b) == 1 ) bt= as.matrix(as.numeric(b[[1]][[2]][,1])) else bt=do.call(cbind,lapply(b, function(h) as.numeric(h[[2]][,1])))
+rownames(bt)=b[[1]][[2]][,2]
+
+bt=as.matrix(bt[-c(1,dim(bt)[[1]]),])
+bt=100*bt/colSums(bt)
+colnames(bt) = unlist(lapply(b, function(h) h[[1]]))
+
+#bt=bt[,unique(labs$Species)]
+
+t=do.call(rbind,lapply(unique(labs$Species), function(h) c(h, sum(labs$Species %in% h))))
+b=t[,1]
+t=as.numeric(t[,2])
+names(t) = b 
+t=paste(t[colnames(bt)],"sample")
+
+pdf(paste(sep="/",repdir,'buscostats.pdf'), width=10, height=8)
+par(mar=c(10,5,1,5))
+b=barplot(bt, las=2, legend.text=rownames(bt), ylim=c(0,135), ylab='BUSCO score (%)')
+dev.off()
+
+bt1=apply(bt,2, function(h) paste(format(h,digits=2),"%"))
+
+rownames(bt1)=rownames(bt)
+print(bt1)
+xtabs[["!!table:buscostats!!"]]=xtable(bt1,caption="BUSCO scores", label="table:buscostats", align=c("c",rep("p{2.5cm}", dim(bt1)[[2]])))
+
+print('Annotation stats')
+
+annf=list.files('1.3.annotation/', pattern='*.blast*', full.names=T)
+
+sp=unique(labs$Species)
+ann=lapply(sp, function(n) 
+{ 
+  annfs=annf[grepl(n,annf)]
+  
+  print(n)
+  if(!file.exists(paste(sep="",repdir,'/ann.pid_',blastpid,'.',n,'.RDATA')))
+  {
+    trs=read.csv(paste(sep='', '2.1.filtered.transcriptomes.',thresh,'/',n,'.filtered.fasta.cdhit.fasta'), stringsAsFactors=F, sep='\t', header=F);
+    trs=gsub('>','',unlist(lapply(strsplit(trs$V1[grepl('>',trs$V1)], split=' '), function(j) j[[1]])))
+   
+    h=do.call(rbind, lapply(annfs, function(h)
+     {
+       h= read.csv(h, stringsAsFactors=F, sep='\t', header=F);
+       h=h[h$V1%in% trs & h$V3 >=blastpid,];
+    }));
+    
+    hmq=h[aggregate(1:dim(h)[[1]], list(h$V1), FUN = function(a) 
+    {
+      if (length(a)==1)
+        a 
+      else 
+      a[[which.max(h$V12[a])]] 
+    })$x,]
+        
+    save(file=paste(sep="",repdir,'/ann.pid_',blastpid,'.',n,'.RDATA'), 'n','trs','hmq','h')
+  }
+  else
+    load(file=paste(sep="",repdir,'/ann.pid_',blastpid,'.',n,'.RDATA'))
+  tv1=table(trs%in% hmq$V1)/length(trs) 
+  tV1=table(trs%in% h$V1)/length(trs) 
+  list(n,trs,hmq,tv1,tV1,h)
+})
+
+names(ann)=gsub('.blast.txt','',unique(labs$Species))
+#save(file=paste(sep="",repdir,'/ann.RDATA'), 'ann')
+
+if (length(ann)==1) annt=as.matrix(ann[[1]][[4]][2]) else annt = do.call(rbind,lapply(ann, function(h) h[[4]][2]))
+colnames(annt) = paste("annotated transcripts(%) at PID >=",blastpid)
+rownames(annt)=sp
+
+pdf(paste(sep="",repdir,'/annstats_pid',blastpid,'.pdf'), width=10, height=8)
+par(mar=c(10,5,1,5))
+b=barplot(100*t(annt), beside=T, las=2, cex.axis=1, cex= 1,legend.text=colnames(annt), ylim=c(0,110), ylab=paste('Percentage Annotated transcripts at PID >=',blastpid))
+dev.off()
+
+annt=paste(format(digits=1,100*annt),"%",sep="")
+if(is.null(dim(annt)))
+  annt=as.matrix(annt, ncol=1)
+colnames(annt)= paste("annotated transcripts(%) at PID >=",blastpid)
+rownames(annt) = unlist(lapply(ann, function(h) h[[1]]))
+print(annt)
+xtabs[["!!table:annstats!!"]]=xtable(annt,caption="Annotation statistics", label="table:annstats", align=c("r","c"))
+
+print('Length distribution')
+
+if (!file.exists(paste(sep="",repdir,'/lengthdist.pdf')))
+{
+  nll=trsFromFasta('/nfs/ngs/WINKNGS/Villarin/Lupinen/Transcriptome/Lupinus_angustifolius_cds_v1.0.fa')#### todo CHANGE THIS for custom transcriptome??
+  trs=lapply(list.files("2.1.filtered.transcriptomes.0.05/", pattern='*.fasta$', full.names=T), trsFromFasta)
+  names(trs)= gsub(".filtered.fasta.cdhit.fasta","",list.files("2.1.filtered.transcriptomes.0.05/", pattern='*.fasta$'))
+  trs=trs[unique(labs$Species)]
+  
+  pdf(paste(sep="",repdir,'/lengthdist.pdf'))
+  plot(density(log(as.numeric(nll[,2]))), main='Transcript log-length distribution', xlab='Log-length', ylab='density', ylim=c(0,1))
+  lapply(1:length(trs), function(h){print(h); lines(density(log(as.numeric(trs[[h]][,2]))), col = h+1, lty=2, lwd=2)} )  
+  legend('topright', col=1:(length(trs)+1), lty=c(1, rep(2, length(trs))), lwd=c(1, rep(2, length(trs))), legend=c('Ref. NLL transcriptome', names(trs)))
+  dev.off()
+}
+#################### TODO ##############################################
+l1=list()
+if (grepl("swissprot",anndb, ignore.case=T))
+{
+  orgs=lapply(1:length(ann), function(h)
+  {
+    h=table(unlist(lapply(strsplit(ann[[h]][[3]]$V2,split='_'), function(h) h[[2]])));
+    h=h[order(h,decreasing=T)];
+  })
+
+
+  toporg=unlist(list.intersect(lapply(orgs, function(h) head(names(h),min(20, length(h))))))
+  print(toporg)
+  pdf(paste(sep="",repdir,'/orgsannstats.pdf'), width=10, height=8)
+  par(mar=c(10,5,1,5))
+  barplot(do.call(rbind, lapply(orgs, function(h) h[toporg])),las=2, beside=T, ylab="Percentage of Swissprot organisms of annotated transcripts")
+  dev.off()
+
+l1=c("\\begin{figure}","\\centering","\\includegraphics{orgsannstats}","\\caption{Distribution of top SWP-organisms to which our transcripts were annotated}","\\label{fig:swporgs}", "\\end{figure}")
+
+}
+
+
+
+
+#Import transcriptome statistics and make nice table.
+
+stats=read.table("3.transrate/assembies.stats.csv", sep=',', header=T, stringsAsFactors=F)
+rownames(stats)=gsub(".filtered.cdhit","",gsub(".fasta","",unlist(lapply(strsplit(stats$assembly, split="/"), function(h) h[[length(h)]]))))
+stats=stats[, !is.na(colSums(data.matrix(stats)))]
+xtabs[["!!table:trsstats!!"]]=xtable(t(stats),caption="Transcriptome statistics", label="table:trsstats", align=c("c",rep("p{2.5cm}", dim(stats)[[1]])))
+
+l=subs.xtable(xtabs,readLines(paste(pdir,sep="","../templates/report.tex")))
+file.copy(from=paste(pdir,sep="","../templates/pipeline.jpg"), to = repdir)
+file.copy(from=paste(pdir,sep="","../templates/ref.bib"), to = repdir)
+l=gsub("!!blastpid!!",blastpid,gsub("!!thresh!!",paste(sep="","$",format(digits=3,as.numeric(thresh)*100),"$"),gsub("!!blast!!",
+blast,gsub("!!buscodb!!",buscodb,gsub("!!anndb!!",anndb,unlist(l))))))
+l = c(l[1:(grep("!!fig:swporgs!!", l)-1)],l1,l[(grep("!!fig:swporgs!!", l)+1):length(l)])
+
+writeLines(con=paste(sep="",repdir,'/report.tex'),text=unlist(l))

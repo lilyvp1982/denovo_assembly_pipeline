@@ -1,0 +1,43 @@
+/*** software paths for rna_pipeline ***/
+/*** Please ONLY fill in, in case you install in new plattform or want to use different software versions ***/
+
+/*******   PATH.TO.SOFTWARE *******/
+
+/*** 0. Important paths to be included ***/
+spath=/opt/husar/bin
+
+/*** 1. TRINITY ***/
+TRINITY=/gcg/husar/ngs/Trinity-v2.6.5
+
+/*** 2. SAMTOOLS ***/
+SAMTOOLS=samtools-1.3.1
+
+/*** 3. BLASTN ***/
+BLASTN=/gcg/husar/add_ons/blastn223plus.org
+
+/*** 4. BLASTX ***/
+BLASTX=/gcg/husar/add_ons/blastx250plus.org
+
+/*** 5. CD-HIT ***/
+CDHIT=cd-hit-est
+
+/*** 6. RSCRIPT ***/
+RSCRIPT=Rscript-3.0.1
+
+/*** 7. AUGUSTO CONFIG DIR> PART OF BUSCO ***/
+augustoconfig=/nfs/ngs/WINKNGS/Villarin/BUSCODB/augustus_config/
+
+/*** 8. PYTHON cmd need be 2.7 or bigger for BUSCO to work ***/
+PYTHON=/opt/husar/bin/python
+
+/*** 9. runBusco.py program  ***/
+runBusco=/gcg/husar/ngs/run_BUSCO.py
+
+/*** 10. makeblastdb cmd  ***/
+makeblastdb=makeblastdb
+
+/*** 11. BWA MEM ***/
+BWA=bwa-0.7.12
+
+/*** 12. BWA MEM ***/
+perl=perl
